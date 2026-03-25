@@ -1,0 +1,19 @@
+# Binary (local build / install artifact)
+/dmr-plugin-jenkins
+dmr-plugin-jenkins
+*.exe
+
+# Cross-compile outputs
+dmr-plugin-jenkins-*
+
+# Go
+*.test
+*.out
+coverage.out
+vendor/
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
