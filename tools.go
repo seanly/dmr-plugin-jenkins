@@ -10,7 +10,16 @@ import (
 	"unicode/utf8"
 )
 
-const defaultJobTree = "name,url,buildable,lastBuild[number,url,result,timestamp]"
+const (
+	defaultJobTree = "name,url,buildable,lastBuild[number,url,result,timestamp]"
+	// defaultRootJobTree lists top-level jobs/folders from Jenkins root /api/json.
+	defaultRootJobTree = "jobs[name,url,buildable,_class,lastBuild[number,url,result,timestamp]]"
+)
+
+func jenkinsGetJobIsRootListing(job string) bool {
+	j := strings.TrimSpace(job)
+	return j == "" || j == "."
+}
 
 func (p *JenkinsPlugin) resolveInstance(args map[string]any) (string, *jenkinsClient, error) {
 	inst := ""
@@ -61,14 +70,19 @@ func (p *JenkinsPlugin) toolInstances() (any, error) {
 
 func (p *JenkinsPlugin) toolGetJob(ctx context.Context, c *jenkinsClient, args map[string]any) (any, error) {
 	job := strArg(args, "job")
-	if job == "" {
-		return nil, fmt.Errorf("job required")
-	}
 	tree := strArg(args, "tree")
-	if tree == "" {
-		tree = defaultJobTree
+	var path string
+	if jenkinsGetJobIsRootListing(job) {
+		if tree == "" {
+			tree = defaultRootJobTree
+		}
+		path = "/api/json?tree=" + url.QueryEscape(tree)
+	} else {
+		if tree == "" {
+			tree = defaultJobTree
+		}
+		path = jobURLPath(job) + "/api/json?tree=" + url.QueryEscape(tree)
 	}
-	path := jobURLPath(job) + "/api/json?tree=" + url.QueryEscape(tree)
 	st, body, err := c.get(ctx, path)
 	if err != nil {
 		return nil, err

@@ -88,15 +88,14 @@ func (p *JenkinsPlugin) ProvideTools(req *proto.ProvideToolsRequest, resp *proto
 		},
 		{
 			Name:        "jenkinsGetJob",
-			Description: "获取 Job 元数据（GET api/json）；job 为 Jenkins UI 完整名称（含 Folder），如 team/android/build",
+			Description: "获取 Job 元数据（GET api/json）。job 为 Jenkins UI 完整名称（含 Folder），如 team/android/build。省略 job、空字符串或英文句点 . 表示实例根，返回顶层 jobs（默认 tree 含 jobs[...]）；子 Folder 下列子项需自定义 tree 包含 jobs 字段",
 			ParametersJSON: `{
 				"type": "object",
 				"properties": {
 					"instance": {"type": "string", "description": "实例 id；省略时使用 default_instance"},
-					"job": {"type": "string", "description": "Job full name"},
+					"job": {"type": "string", "description": "Job full name；省略、空或单个句点 . 表示列出实例根下顶层 Job/Folder"},
 					"tree": {"type": "string", "description": "可选 api/json tree 参数"}
-				},
-				"required": ["job"]
+				}
 			}`,
 		},
 		{
