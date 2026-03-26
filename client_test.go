@@ -92,10 +92,11 @@ func TestTruncateBody(t *testing.T) {
 	}
 }
 
-func TestDoReqLimitBody(t *testing.T) {
+func TestDoReqReadsFullResponseWithinCap(t *testing.T) {
+	const n = 100_000 // well above old 2KiB accidental cap, well below maxReadBodyLen
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		_, _ = io.WriteString(w, strings.Repeat("a", maxErrBodyLen+500))
+		_, _ = io.WriteString(w, strings.Repeat("a", n))
 	}))
 	defer srv.Close()
 
@@ -110,7 +111,28 @@ func TestDoReqLimitBody(t *testing.T) {
 	if st != 200 {
 		t.Fatalf("status %d", st)
 	}
-	if len(body) != maxErrBodyLen+1 { // LimitReader max
-		t.Fatalf("len %d", len(body))
+	if len(body) != n {
+		t.Fatalf("len %d; want %d (response must not be capped at maxErrBodyLen)", len(body), n)
+	}
+}
+
+func TestReadHTTPBody_RejectsOverMax(t *testing.T) {
+	const max = 100
+	r := strings.NewReader(strings.Repeat("b", max+50))
+	_, err := readHTTPBody(r, max)
+	if err == nil {
+		t.Fatal("expected error when body exceeds max")
+	}
+}
+
+func TestReadHTTPBody_OkAtExactlyMax(t *testing.T) {
+	const max = 50
+	want := strings.Repeat("c", max)
+	b, err := readHTTPBody(strings.NewReader(want), max)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != want {
+		t.Fatalf("got len %d", len(b))
 	}
 }

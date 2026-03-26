@@ -101,15 +101,19 @@ func (p *JenkinsPlugin) ProvideTools(req *proto.ProvideToolsRequest, resp *proto
 		},
 		{
 			Name:        "jenkinsListBuilds",
-			Description: "列出 Job 最近若干次构建（api/json tree=builds[...]）",
+			Description: "列出 Job 构建列表（有 job 时）或全局正在运行/排队（等待资源）（无 job 时）",
 			ParametersJSON: `{
 				"type": "object",
 				"properties": {
 					"instance": {"type": "string"},
-					"job": {"type": "string"},
-					"limit": {"type": "integer", "description": "数量，默认 10"}
+					"job": {"type": "string", "description": "Job full name；省略/为空则查询全局正在运行/排队"},
+					"limit": {"type": "integer", "description": "仅当 job 存在时生效：返回该 job 最近若干次构建，默认 10"},
+					"include_running": {"type": "boolean", "description": "是否包含正在执行的构建；默认 true"},
+					"include_queued": {"type": "boolean", "description": "是否包含排队中/等待资源的构建；默认 true"},
+					"running_limit": {"type": "integer", "description": "仅当 job 为空时生效：running 返回条数上限，默认 10"},
+					"queue_limit": {"type": "integer", "description": "仅当 job 为空时生效：queued 返回条数上限，默认 20"}
 				},
-				"required": ["job"]
+				"additionalProperties": true
 			}`,
 		},
 		{

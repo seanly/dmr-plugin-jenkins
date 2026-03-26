@@ -15,7 +15,12 @@ import (
 	"time"
 )
 
-const maxErrBodyLen = 2048
+const (
+	maxErrBodyLen = 2048 // max bytes included in error message snippets (httpError)
+	// maxReadBodyLen caps how much of any response body we read (protects memory on malicious huge bodies).
+	// Jenkins /computer and /queue JSON can exceed a few KB; the previous 2KiB cap truncated valid JSON and broke json.Unmarshal.
+	maxReadBodyLen = 8 << 20 // 8MiB
+)
 
 type crumbData struct {
 	Crumb             string `json:"crumb"`
@@ -119,11 +124,24 @@ func (jc *jenkinsClient) doReq(ctx context.Context, method, path string, headers
 		return 0, nil, err
 	}
 	defer resp.Body.Close()
-	b, err := io.ReadAll(io.LimitReader(resp.Body, maxErrBodyLen+1))
+	b, err := readHTTPBody(resp.Body, maxReadBodyLen)
 	if err != nil {
 		return resp.StatusCode, nil, err
 	}
 	return resp.StatusCode, b, nil
+}
+
+// readHTTPBody reads up to maxBytes from r. If more than maxBytes are available,
+// returns an error so callers never decode truncated JSON.
+func readHTTPBody(r io.Reader, maxBytes int) ([]byte, error) {
+	b, err := io.ReadAll(io.LimitReader(r, int64(maxBytes)+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(b) > maxBytes {
+		return nil, fmt.Errorf("jenkins: response body exceeds %d bytes (maxReadBodyLen); narrow the API tree or raise the limit in plugin", maxBytes)
+	}
+	return b, nil
 }
 
 func (jc *jenkinsClient) get(ctx context.Context, path string) (int, []byte, error) {
