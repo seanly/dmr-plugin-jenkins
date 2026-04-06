@@ -79,12 +79,11 @@ func (p *JenkinsPlugin) RequestBatchApproval(req *proto.BatchApprovalRequest, re
 func (p *JenkinsPlugin) ProvideTools(req *proto.ProvideToolsRequest, resp *proto.ProvideToolsResponse) error {
 	resp.Tools = []proto.ToolDef{
 		{
-			Name:        "jenkinsInstances",
-			Description: "列出本插件已配置的 Jenkins 实例 id 与 host（不含密钥）",
-			ParametersJSON: `{
-				"type": "object",
-				"properties": {}
-			}`,
+			Name:           "jenkinsInstances",
+			Description:    "列出本插件已配置的 Jenkins 实例 id 与 host（不含密钥）",
+			ParametersJSON: `{"type": "object", "properties": {}}`,
+			Group:          "extended",
+			SearchHint:     "jenkins, instance, list, ci, 实例, 列表",
 		},
 		{
 			Name:        "jenkinsGetJob",
@@ -97,6 +96,8 @@ func (p *JenkinsPlugin) ProvideTools(req *proto.ProvideToolsRequest, resp *proto
 					"tree": {"type": "string", "description": "可选 api/json tree 参数"}
 				}
 			}`,
+			Group:      "extended",
+			SearchHint: "jenkins, job, get, metadata, folder, ci, 任务, 获取, 元数据",
 		},
 		{
 			Name:        "jenkinsListBuilds",
@@ -114,6 +115,8 @@ func (p *JenkinsPlugin) ProvideTools(req *proto.ProvideToolsRequest, resp *proto
 				},
 				"additionalProperties": true
 			}`,
+			Group:      "extended",
+			SearchHint: "jenkins, build, list, running, queued, ci, 构建, 列表, 运行中, 排队",
 		},
 		{
 			Name:        "jenkinsGetBuild",
@@ -127,6 +130,8 @@ func (p *JenkinsPlugin) ProvideTools(req *proto.ProvideToolsRequest, resp *proto
 				},
 				"required": ["job", "build_number"]
 			}`,
+			Group:      "extended",
+			SearchHint: "jenkins, build, get, detail, ci, 构建, 获取, 详情",
 		},
 		{
 			Name:        "jenkinsTriggerBuild",
@@ -144,6 +149,8 @@ func (p *JenkinsPlugin) ProvideTools(req *proto.ProvideToolsRequest, resp *proto
 				},
 				"required": ["job"]
 			}`,
+			Group:      "extended",
+			SearchHint: "jenkins, build, trigger, start, ci, 构建, 触发, 启动",
 		},
 		{
 			Name:        "jenkinsGetConsoleText",
@@ -158,6 +165,8 @@ func (p *JenkinsPlugin) ProvideTools(req *proto.ProvideToolsRequest, resp *proto
 				},
 				"required": ["job", "build_number"]
 			}`,
+			Group:      "extended",
+			SearchHint: "jenkins, build, console, log, output, ci, 构建, 控制台, 日志, 输出",
 		},
 	}
 	return nil
