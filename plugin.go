@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/seanly/dmr/pkg/plugin/proto"
@@ -11,71 +14,64 @@ import (
 
 // JenkinsPlugin implements proto.DMRPluginInterface.
 type JenkinsPlugin struct {
+	mu      sync.RWMutex
 	cfg     JenkinsPluginConfig
-	clients map[string]*jenkinsClient
+	clients map[string]JenkinsClient
 }
 
-// NewJenkinsPlugin creates an empty plugin (config applied in Init).
+// NewJenkinsPlugin creates a new plugin instance.
 func NewJenkinsPlugin() *JenkinsPlugin {
 	return &JenkinsPlugin{
-		clients: make(map[string]*jenkinsClient),
+		cfg:     defaultConfig(),
+		clients: make(map[string]JenkinsClient),
 	}
 }
 
+// Init initializes the plugin with configuration.
+// Uses lazy initialization - doesn't connect to Jenkins here.
 func (p *JenkinsPlugin) Init(req *proto.InitRequest, resp *proto.InitResponse) error {
-	if req.ConfigJSON != "" {
+	// Parse config (will override defaults)
+	if req.ConfigJSON != "" && req.ConfigJSON != "null" {
 		if err := json.Unmarshal([]byte(req.ConfigJSON), &p.cfg); err != nil {
 			return fmt.Errorf("parse config: %w", err)
 		}
 	}
+
 	if err := validateConfig(&p.cfg); err != nil {
 		return err
 	}
 
-	p.clients = make(map[string]*jenkinsClient)
-	for i := range p.cfg.Instances {
-		inst := &p.cfg.Instances[i]
-		id := strings.TrimSpace(inst.ID)
-		base, err := NormalizeBaseURL(inst.BaseURL)
-		if err != nil {
-			return fmt.Errorf("instance %q: %w", id, err)
-		}
-		sec := inst.TimeoutSeconds
-		to := time.Duration(sec) * time.Second
-		if sec <= 0 {
-			to = 30 * time.Second
-		}
-		cl, err := newJenkinsClient(
-			base,
-			strings.TrimSpace(inst.Username),
-			strings.TrimSpace(inst.APIToken),
-			inst.normalizedVerifyTLS(),
-			to,
-			inst.HTTPProxy,
-		)
-		if err != nil {
-			return fmt.Errorf("instance %q: %w", id, err)
-		}
-		p.clients[id] = cl
-	}
+	// Lazy initialization - don't create clients here
+	p.clients = make(map[string]JenkinsClient)
 	return nil
 }
 
+// Shutdown cleans up the plugin.
 func (p *JenkinsPlugin) Shutdown(req *proto.ShutdownRequest, resp *proto.ShutdownResponse) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for _, client := range p.clients {
+		_ = client.Close()
+	}
+	p.clients = make(map[string]JenkinsClient)
 	return nil
 }
 
+// RequestApproval is not implemented by this plugin.
 func (p *JenkinsPlugin) RequestApproval(req *proto.ApprovalRequest, resp *proto.ApprovalResult) error {
 	resp.Choice = 0
 	resp.Comment = "jenkins plugin does not handle approvals"
 	return nil
 }
 
+// RequestBatchApproval is not implemented by this plugin.
 func (p *JenkinsPlugin) RequestBatchApproval(req *proto.BatchApprovalRequest, resp *proto.BatchApprovalResult) error {
 	resp.Choice = 0
 	return nil
 }
 
+// ProvideTools returns the list of tools provided by this plugin.
 func (p *JenkinsPlugin) ProvideTools(req *proto.ProvideToolsRequest, resp *proto.ProvideToolsResponse) error {
 	resp.Tools = []proto.ToolDef{
 		{
@@ -87,7 +83,7 @@ func (p *JenkinsPlugin) ProvideTools(req *proto.ProvideToolsRequest, resp *proto
 		},
 		{
 			Name:        "jenkinsGetJob",
-			Description: "获取 Job 元数据（GET api/json）。job 为 Jenkins UI 完整名称（含 Folder），如 team/android/build。省略 job、空字符串或英文句点 . 表示实例根，返回顶层 jobs（默认 tree 含 jobs[...]）；子 Folder 下列子项需自定义 tree 包含 jobs 字段",
+			Description: "获取 Job 元数据（GET api/json）。job 为 Jenkins UI 完整名称（含 Folder），如 team/android/build。省略、空或单个句点 . 表示列出实例根下顶层 Job/Folder",
 			ParametersJSON: `{
 				"type": "object",
 				"properties": {
@@ -112,8 +108,7 @@ func (p *JenkinsPlugin) ProvideTools(req *proto.ProvideToolsRequest, resp *proto
 					"include_queued": {"type": "boolean", "description": "是否包含排队中/等待资源的构建；默认 true"},
 					"running_limit": {"type": "integer", "description": "仅当 job 为空时生效：running 返回条数上限，默认 10"},
 					"queue_limit": {"type": "integer", "description": "仅当 job 为空时生效：queued 返回条数上限，默认 20"}
-				},
-				"additionalProperties": true
+				}
 			}`,
 			Group:      "extended",
 			SearchHint: "jenkins, build, list, running, queued, ci, 构建, 列表, 运行中, 排队",
@@ -172,22 +167,138 @@ func (p *JenkinsPlugin) ProvideTools(req *proto.ProvideToolsRequest, resp *proto
 	return nil
 }
 
+// CallTool executes a tool call.
 func (p *JenkinsPlugin) CallTool(req *proto.CallToolRequest, resp *proto.CallToolResponse) error {
 	var args map[string]any
 	if err := json.Unmarshal([]byte(req.ArgsJSON), &args); err != nil {
 		resp.Error = fmt.Sprintf("parse args: %v", err)
 		return nil
 	}
-	out, err := p.executeTool(req.Name, args)
+
+	// Create context with timeout
+	timeout := time.Duration(p.cfg.Defaults.RequestTimeoutSeconds) * time.Second
+	if timeout == 0 {
+		timeout = 60 * time.Second
+	}
+
+	result, err := p.executeToolWithTimeout(req.Name, args, timeout)
 	if err != nil {
 		resp.Error = err.Error()
 		return nil
 	}
-	b, err := json.Marshal(out)
+
+	b, err := json.Marshal(result)
 	if err != nil {
 		resp.Error = fmt.Sprintf("marshal result: %v", err)
 		return nil
 	}
 	resp.ResultJSON = string(b)
 	return nil
+}
+
+// executeToolWithTimeout executes a tool with the given timeout.
+func (p *JenkinsPlugin) executeToolWithTimeout(name string, args map[string]any, timeout time.Duration) (any, error) {
+	// Special case: jenkinsInstances doesn't need a client
+	if name == "jenkinsInstances" {
+		return p.toolInstances()
+	}
+
+	// Parse instance from args
+	parser := NewRequestParser(args)
+	instanceID := parser.Instance(&p.cfg)
+	if instanceID == "" {
+		return nil, fmt.Errorf("instance required (or set default_instance in plugin config)")
+	}
+
+	// Get or create client for this instance
+	client, err := p.ensureClient(instanceID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Execute the tool
+	switch name {
+	case "jenkinsGetJob":
+		return p.toolGetJob(args, client)
+	case "jenkinsListBuilds":
+		return p.toolListBuilds(args, client)
+	case "jenkinsGetBuild":
+		return p.toolGetBuild(args, client)
+	case "jenkinsTriggerBuild":
+		return p.toolTriggerBuild(args, client)
+	case "jenkinsGetConsoleText":
+		return p.toolGetConsoleText(args, client)
+	default:
+		return nil, fmt.Errorf("unknown tool: %s", name)
+	}
+}
+
+// ensureClient ensures a client exists for the given instance.
+// Uses lazy initialization with double-checked locking.
+func (p *JenkinsPlugin) ensureClient(instanceID string) (JenkinsClient, error) {
+	// Fast path: client exists
+	p.mu.RLock()
+	if client, ok := p.clients[instanceID]; ok {
+		p.mu.RUnlock()
+		return client, nil
+	}
+	p.mu.RUnlock()
+
+	// Slow path: create client
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Double-check after acquiring lock
+	if client, ok := p.clients[instanceID]; ok {
+		return client, nil
+	}
+
+	// Find instance config
+	var instCfg *JenkinsInstanceConfig
+	for i := range p.cfg.Instances {
+		if p.cfg.Instances[i].ID == instanceID {
+			instCfg = &p.cfg.Instances[i]
+			break
+		}
+	}
+	if instCfg == nil {
+		return nil, fmt.Errorf("unknown instance: %s", instanceID)
+	}
+
+	// Create HTTP client
+	var client JenkinsClient
+	httpClient, err := newHTTPJenkinsClient(context.Background(), instCfg)
+	if err != nil {
+		return nil, fmt.Errorf("connect to %s: %w", instanceID, err)
+	}
+	client = httpClient
+
+	// Wrap with cache if configured
+	ttl := instCfg.effectiveCacheTTL(&p.cfg)
+	if ttl > 0 {
+		client = NewCachedClient(client, ttl)
+	}
+
+	p.clients[instanceID] = client
+	return client, nil
+}
+
+// toolInstances returns the list of configured instances.
+func (p *JenkinsPlugin) toolInstances() (*InstancesResponse, error) {
+	resp := &InstancesResponse{
+		Instances: make([]InstanceInfo, 0, len(p.cfg.Instances)),
+	}
+
+	for _, in := range p.cfg.Instances {
+		host := in.BaseURL
+		if u, err := url.Parse(strings.TrimSpace(in.BaseURL)); err == nil && u.Host != "" {
+			host = u.Host
+		}
+		resp.Instances = append(resp.Instances, InstanceInfo{
+			ID:   in.ID,
+			Host: host,
+		})
+	}
+
+	return resp, nil
 }

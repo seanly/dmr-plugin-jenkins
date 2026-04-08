@@ -19,26 +19,30 @@ Every tool accepts optional `instance` (string). If omitted, `default_instance` 
 
 DMR merges `plugins[].config` into `Init` JSON (see DMR `AGENTS.md`). Use **`api_token`** per instance (plain or DMR `enc:` after host unseal).
 
-```yaml
-plugins:
-  - name: jenkins
-    enabled: true
-    path: /opt/dmr/plugins/dmr-plugin-jenkins
-    config:
-      default_instance: ci-prod
-      instances:
-        - id: ci-prod
-          base_url: "https://jenkins.prod.example.com"
-          username: "svc-dmr"
-          api_token: "enc:..."  # or dev plaintext
-          verify_tls: true
-          timeout_seconds: 60
-        - id: ci-lab
-          base_url: "https://jenkins.lab.local:8080"
-          username: "dmr"
-          api_token: "..."
-          verify_tls: false
-          timeout_seconds: 30
+```toml
+[[plugins]]
+name = "jenkins"
+enabled = true
+path = "/opt/dmr/plugins/dmr-plugin-jenkins"
+
+[plugins.config]
+default_instance = "ci-prod"
+
+[[plugins.config.instances]]
+id = "ci-prod"
+base_url = "https://jenkins.prod.example.com"
+username = "svc-dmr"
+api_token = "enc:..."  # or dev plaintext
+verify_tls = true
+timeout_seconds = 60
+
+[[plugins.config.instances]]
+id = "ci-lab"
+base_url = "https://jenkins.lab.local:8080"
+username = "dmr"
+api_token = "..."
+verify_tls = false
+timeout_seconds = 30
 ```
 
 - **`job` parameter**: Jenkins **full name** as in the UI (e.g. `team/android/build`), not only the leaf name when folders exist.
@@ -48,14 +52,16 @@ plugins:
 
 Shipped under `policies/jenkins.rego`. Load it next to the default bundle:
 
-```yaml
-plugins:
-  - name: opa_policy
-    enabled: true
-    config:
-      policies:
-        - /path/to/dmr/plugins/opapolicy/policies/default.rego
-        - /path/to/dmr-plugin-jenkins/policies/jenkins.rego
+```toml
+[[plugins]]
+name = "opa_policy"
+enabled = true
+
+[plugins.config]
+policies = [
+    "/path/to/dmr/plugins/opapolicy/policies/default.rego",
+    "/path/to/dmr-plugin-jenkins/policies/jenkins.rego"
+]
 ```
 
 Write tools (`jenkinsTriggerBuild`, and Phase 2 names in the set) require **approval** by default. Extend `jenkins_write_tools` when adding new mutating tools.

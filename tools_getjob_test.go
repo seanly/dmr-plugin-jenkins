@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestToolGetJob_RootListing_EmptyJob(t *testing.T) {
@@ -20,12 +19,18 @@ func TestToolGetJob_RootListing_EmptyJob(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	jc, err := newJenkinsClient(strings.TrimSuffix(srv.URL, "/"), "u", "t", true, 5*time.Second, "")
+	cfg := &JenkinsInstanceConfig{
+		BaseURL:        strings.TrimSuffix(srv.URL, "/"),
+		Username:       "u",
+		APIToken:       "t",
+		TimeoutSeconds: 5,
+	}
+	jc, err := newHTTPJenkinsClient(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	p := NewJenkinsPlugin()
-	out, err := p.toolGetJob(context.Background(), jc, map[string]any{})
+	out, err := p.toolGetJob(map[string]any{}, jc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +45,7 @@ func TestToolGetJob_RootListing_EmptyJob(t *testing.T) {
 			Name string `json:"name"`
 		} `json:"jobs"`
 	}
-	if err := json.Unmarshal(out.(json.RawMessage), &wrap); err != nil {
+	if err := json.Unmarshal(out.Data, &wrap); err != nil {
 		t.Fatal(err)
 	}
 	if len(wrap.Jobs) != 1 || wrap.Jobs[0].Name != "alpha" {
@@ -57,12 +62,18 @@ func TestToolGetJob_RootListing_DotJob(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	jc, err := newJenkinsClient(strings.TrimSuffix(srv.URL, "/"), "u", "t", true, 5*time.Second, "")
+	cfg := &JenkinsInstanceConfig{
+		BaseURL:        strings.TrimSuffix(srv.URL, "/"),
+		Username:       "u",
+		APIToken:       "t",
+		TimeoutSeconds: 5,
+	}
+	jc, err := newHTTPJenkinsClient(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	p := NewJenkinsPlugin()
-	_, err = p.toolGetJob(context.Background(), jc, map[string]any{"job": "."})
+	_, err = p.toolGetJob(map[string]any{"job": "."}, jc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,12 +92,18 @@ func TestToolGetJob_NamedJobUsesJobPath(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	jc, err := newJenkinsClient(strings.TrimSuffix(srv.URL, "/"), "u", "t", true, 5*time.Second, "")
+	cfg := &JenkinsInstanceConfig{
+		BaseURL:        strings.TrimSuffix(srv.URL, "/"),
+		Username:       "u",
+		APIToken:       "t",
+		TimeoutSeconds: 5,
+	}
+	jc, err := newHTTPJenkinsClient(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	p := NewJenkinsPlugin()
-	_, err = p.toolGetJob(context.Background(), jc, map[string]any{"job": "folder/leaf"})
+	_, err = p.toolGetJob(map[string]any{"job": "folder/leaf"}, jc)
 	if err != nil {
 		t.Fatal(err)
 	}

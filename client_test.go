@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
 func TestJenkinsClientCrumbAndPost(t *testing.T) {
@@ -35,7 +34,13 @@ func TestJenkinsClientCrumbAndPost(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	jc, err := newJenkinsClient(strings.TrimSuffix(srv.URL, "/"), "u", "t", true, 5*time.Second, "")
+	cfg := &JenkinsInstanceConfig{
+		BaseURL:        strings.TrimSuffix(srv.URL, "/"),
+		Username:       "u",
+		APIToken:       "t",
+		TimeoutSeconds: 5,
+	}
+	jc, err := newHTTPJenkinsClient(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +70,13 @@ func TestJenkinsClientNoCrumb404(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	jc, err := newJenkinsClient(strings.TrimSuffix(srv.URL, "/"), "u", "t", true, 5*time.Second, "")
+	cfg := &JenkinsInstanceConfig{
+		BaseURL:        strings.TrimSuffix(srv.URL, "/"),
+		Username:       "u",
+		APIToken:       "t",
+		TimeoutSeconds: 5,
+	}
+	jc, err := newHTTPJenkinsClient(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +111,13 @@ func TestDoReqReadsFullResponseWithinCap(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	jc, err := newJenkinsClient(strings.TrimSuffix(srv.URL, "/"), "u", "t", true, 5*time.Second, "")
+	cfg := &JenkinsInstanceConfig{
+		BaseURL:        strings.TrimSuffix(srv.URL, "/"),
+		Username:       "u",
+		APIToken:       "t",
+		TimeoutSeconds: 5,
+	}
+	jc, err := newHTTPJenkinsClient(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

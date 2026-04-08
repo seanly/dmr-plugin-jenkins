@@ -4,15 +4,50 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // JenkinsPluginConfig is the plugin Init JSON (DMR-injected keys included).
 type JenkinsPluginConfig struct {
-	DefaultInstance string               `json:"default_instance"`
+	DefaultInstance string                  `json:"default_instance"`
 	Instances       []JenkinsInstanceConfig `json:"instances"`
-	ConfigBaseDir   string               `json:"config_base_dir"`
-	Workspace       string               `json:"workspace"`
-	PluginName      string               `json:"plugin_name"`
+	ConfigBaseDir   string                  `json:"config_base_dir"`
+	Workspace       string                  `json:"workspace"`
+	PluginName      string                  `json:"plugin_name"`
+
+	// Defaults holds global default configuration
+	Defaults DefaultConfig `json:"defaults"`
+}
+
+// DefaultConfig holds default values for various operations
+type DefaultConfig struct {
+	// Timeout configurations
+	RequestTimeoutSeconds int `json:"request_timeout_seconds"`
+	ConnectTimeoutSeconds int `json:"connect_timeout_seconds"`
+
+	// Limit configurations
+	MaxChars     int `json:"max_chars"`
+	BuildLimit   int `json:"build_limit"`
+	RunningLimit int `json:"running_limit"`
+	QueueLimit   int `json:"queue_limit"`
+
+	// Cache configuration
+	CacheTTLSeconds int `json:"cache_ttl_seconds"`
+}
+
+// defaultConfig returns the default configuration
+func defaultConfig() JenkinsPluginConfig {
+	return JenkinsPluginConfig{
+		Defaults: DefaultConfig{
+			RequestTimeoutSeconds: 60,
+			ConnectTimeoutSeconds: 10,
+			MaxChars:              65536,
+			BuildLimit:            10,
+			RunningLimit:          10,
+			QueueLimit:            20,
+			CacheTTLSeconds:       0, // Disabled by default
+		},
+	}
 }
 
 // JenkinsInstanceConfig describes one Jenkins server.
@@ -24,6 +59,26 @@ type JenkinsInstanceConfig struct {
 	VerifyTLS       *bool  `json:"verify_tls"`
 	TimeoutSeconds  int    `json:"timeout_seconds"`
 	HTTPProxy       string `json:"http_proxy"`
+	CacheTTLSeconds int    `json:"cache_ttl_seconds"`
+}
+
+// effectiveTimeout returns the effective timeout for this instance
+func (inst *JenkinsInstanceConfig) effectiveTimeout(cfg *JenkinsPluginConfig) time.Duration {
+	if inst.TimeoutSeconds > 0 {
+		return time.Duration(inst.TimeoutSeconds) * time.Second
+	}
+	if cfg.Defaults.RequestTimeoutSeconds > 0 {
+		return time.Duration(cfg.Defaults.RequestTimeoutSeconds) * time.Second
+	}
+	return 60 * time.Second
+}
+
+// effectiveCacheTTL returns the effective cache TTL for this instance
+func (inst *JenkinsInstanceConfig) effectiveCacheTTL(cfg *JenkinsPluginConfig) time.Duration {
+	if inst.CacheTTLSeconds >= 0 {
+		return time.Duration(inst.CacheTTLSeconds) * time.Second
+	}
+	return time.Duration(cfg.Defaults.CacheTTLSeconds) * time.Second
 }
 
 // NormalizeBaseURL trims trailing slashes from Jenkins root URL.

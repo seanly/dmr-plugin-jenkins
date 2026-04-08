@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestToolListBuilds_GlobalInProgress(t *testing.T) {
@@ -57,13 +56,19 @@ func TestToolListBuilds_GlobalInProgress(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	jc, err := newJenkinsClient(strings.TrimSuffix(srv.URL, "/"), "u", "t", true, 5*time.Second, "")
+	cfg := &JenkinsInstanceConfig{
+		BaseURL:        strings.TrimSuffix(srv.URL, "/"),
+		Username:       "u",
+		APIToken:       "t",
+		TimeoutSeconds: 5,
+	}
+	jc, err := newHTTPJenkinsClient(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	p := NewJenkinsPlugin()
-	out, err := p.toolListBuilds(context.Background(), jc, map[string]any{})
+	out, err := p.toolListBuilds(map[string]any{}, jc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,34 +82,35 @@ func TestToolListBuilds_GlobalInProgress(t *testing.T) {
 		t.Fatalf("queue tree = %q; want %q", gotQueueTree, expectedQueueTree)
 	}
 
-	outMap := out.(map[string]any)
-
-	runningArr := outMap["running"].([]map[string]any)
-	if len(runningArr) != 1 {
-		t.Fatalf("running len = %d; want 1", len(runningArr))
-	}
-	if runningArr[0]["job"].(string) != "team/build" {
-		t.Fatalf("running job = %v; want team/build", runningArr[0]["job"])
-	}
-	if runningArr[0]["build_number"].(int) != 123 {
-		t.Fatalf("build_number = %v; want 123", runningArr[0]["build_number"])
-	}
-	if runningArr[0]["node"].(string) != "nodeA" {
-		t.Fatalf("node = %v; want nodeA", runningArr[0]["node"])
+	globalOut, ok := out.(*ListBuildsGlobalModeResponse)
+	if !ok {
+		t.Fatalf("expected *ListBuildsGlobalModeResponse, got %T", out)
 	}
 
-	queuedArr := outMap["queued"].([]map[string]any)
-	if len(queuedArr) != 1 {
-		t.Fatalf("queued len = %d; want 1", len(queuedArr))
+	if len(globalOut.Running) != 1 {
+		t.Fatalf("running len = %d; want 1", len(globalOut.Running))
 	}
-	if queuedArr[0]["job"].(string) != "team/build" {
-		t.Fatalf("queued job = %v; want team/build", queuedArr[0]["job"])
+	if globalOut.Running[0].Job != "team/build" {
+		t.Fatalf("running job = %v; want team/build", globalOut.Running[0].Job)
 	}
-	if queuedArr[0]["queue_id"].(int) != 7 {
-		t.Fatalf("queue_id = %v; want 7", queuedArr[0]["queue_id"])
+	if globalOut.Running[0].BuildNumber != 123 {
+		t.Fatalf("build_number = %v; want 123", globalOut.Running[0].BuildNumber)
 	}
-	if queuedArr[0]["in_queue_since"].(int64) != 1700000000000 {
-		t.Fatalf("in_queue_since = %v; want 1700000000000", queuedArr[0]["in_queue_since"])
+	if globalOut.Running[0].Node != "nodeA" {
+		t.Fatalf("node = %v; want nodeA", globalOut.Running[0].Node)
+	}
+
+	if len(globalOut.Queued) != 1 {
+		t.Fatalf("queued len = %d; want 1", len(globalOut.Queued))
+	}
+	if globalOut.Queued[0].Job != "team/build" {
+		t.Fatalf("queued job = %v; want team/build", globalOut.Queued[0].Job)
+	}
+	if globalOut.Queued[0].QueueID != 7 {
+		t.Fatalf("queue_id = %v; want 7", globalOut.Queued[0].QueueID)
+	}
+	if globalOut.Queued[0].InQueueSince != 1700000000000 {
+		t.Fatalf("in_queue_since = %v; want 1700000000000", globalOut.Queued[0].InQueueSince)
 	}
 }
 
@@ -123,24 +129,33 @@ func TestToolListBuilds_GlobalInProgress_IncludeFlags(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	jc, err := newJenkinsClient(strings.TrimSuffix(srv.URL, "/"), "u", "t", true, 5*time.Second, "")
+	cfg := &JenkinsInstanceConfig{
+		BaseURL:        strings.TrimSuffix(srv.URL, "/"),
+		Username:       "u",
+		APIToken:       "t",
+		TimeoutSeconds: 5,
+	}
+	jc, err := newHTTPJenkinsClient(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	p := NewJenkinsPlugin()
-	out, err := p.toolListBuilds(context.Background(), jc, map[string]any{
+	out, err := p.toolListBuilds(map[string]any{
 		"include_running": false,
 		"include_queued":  true,
-	})
+	}, jc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	outMap := out.(map[string]any)
-	runningArr := outMap["running"].([]map[string]any)
-	if len(runningArr) != 0 {
-		t.Fatalf("running len = %d; want 0", len(runningArr))
+	globalOut, ok := out.(*ListBuildsGlobalModeResponse)
+	if !ok {
+		t.Fatalf("expected *ListBuildsGlobalModeResponse, got %T", out)
+	}
+
+	if len(globalOut.Running) != 0 {
+		t.Fatalf("running len = %d; want 0", len(globalOut.Running))
 	}
 }
 
@@ -171,27 +186,36 @@ func TestToolListBuilds_PartialComputerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	jc, err := newJenkinsClient(strings.TrimSuffix(srv.URL, "/"), "u", "t", true, 5*time.Second, "")
+	cfg := &JenkinsInstanceConfig{
+		BaseURL:        strings.TrimSuffix(srv.URL, "/"),
+		Username:       "u",
+		APIToken:       "t",
+		TimeoutSeconds: 5,
+	}
+	jc, err := newHTTPJenkinsClient(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	p := NewJenkinsPlugin()
-	out, err := p.toolListBuilds(context.Background(), jc, map[string]any{})
+	out, err := p.toolListBuilds(map[string]any{}, jc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	outMap := out.(map[string]any)
-	errs := outMap["errors"].(map[string]string)
-	if !strings.Contains(errs["computer"], "500") {
-		t.Fatalf("expected computer error mentioning status; got %q", errs["computer"])
+
+	globalOut, ok := out.(*ListBuildsGlobalModeResponse)
+	if !ok {
+		t.Fatalf("expected *ListBuildsGlobalModeResponse, got %T", out)
 	}
-	queuedArr := outMap["queued"].([]map[string]any)
-	if len(queuedArr) != 1 {
-		t.Fatalf("queued len = %d; want 1", len(queuedArr))
+
+	if globalOut.Errors == nil || !strings.Contains(globalOut.Errors["computer"], "500") {
+		t.Fatalf("expected computer error mentioning status; got %q", globalOut.Errors["computer"])
 	}
-	if queuedArr[0]["job"].(string) != "folder/leaf" {
-		t.Fatalf("job = %v", queuedArr[0]["job"])
+	if len(globalOut.Queued) != 1 {
+		t.Fatalf("queued len = %d; want 1", len(globalOut.Queued))
+	}
+	if globalOut.Queued[0].Job != "folder/leaf" {
+		t.Fatalf("job = %v", globalOut.Queued[0].Job)
 	}
 }
 
@@ -225,28 +249,38 @@ func TestToolListBuilds_UnparsedRunningUsesDisplayName(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	jc, err := newJenkinsClient(strings.TrimSuffix(srv.URL, "/"), "u", "t", true, 5*time.Second, "")
+	cfg := &JenkinsInstanceConfig{
+		BaseURL:        strings.TrimSuffix(srv.URL, "/"),
+		Username:       "u",
+		APIToken:       "t",
+		TimeoutSeconds: 5,
+	}
+	jc, err := newHTTPJenkinsClient(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	p := NewJenkinsPlugin()
-	out, err := p.toolListBuilds(context.Background(), jc, map[string]any{})
+	out, err := p.toolListBuilds(map[string]any{}, jc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	outMap := out.(map[string]any)
-	runningArr := outMap["running"].([]map[string]any)
-	if len(runningArr) != 1 {
-		t.Fatalf("running len = %d", len(runningArr))
+
+	globalOut, ok := out.(*ListBuildsGlobalModeResponse)
+	if !ok {
+		t.Fatalf("expected *ListBuildsGlobalModeResponse, got %T", out)
 	}
-	if runningArr[0]["job"].(string) != "team/ci/myjob" {
-		t.Fatalf("job = %v", runningArr[0]["job"])
+
+	if len(globalOut.Running) != 1 {
+		t.Fatalf("running len = %d", len(globalOut.Running))
 	}
-	if runningArr[0]["build_number"].(int) != 77 {
-		t.Fatalf("build_number = %v", runningArr[0]["build_number"])
+	if globalOut.Running[0].Job != "team/ci/myjob" {
+		t.Fatalf("job = %v", globalOut.Running[0].Job)
 	}
-	if _, bad := runningArr[0]["unparsed"]; bad {
+	if globalOut.Running[0].BuildNumber != 77 {
+		t.Fatalf("build_number = %v", globalOut.Running[0].BuildNumber)
+	}
+	if globalOut.Running[0].Unparsed {
 		t.Fatal("expected parsed from fullDisplayName")
 	}
 }
@@ -281,22 +315,32 @@ func TestToolListBuilds_UnparsedFlag(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	jc, err := newJenkinsClient(strings.TrimSuffix(srv.URL, "/"), "u", "t", true, 5*time.Second, "")
+	cfg := &JenkinsInstanceConfig{
+		BaseURL:        strings.TrimSuffix(srv.URL, "/"),
+		Username:       "u",
+		APIToken:       "t",
+		TimeoutSeconds: 5,
+	}
+	jc, err := newHTTPJenkinsClient(context.Background(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	p := NewJenkinsPlugin()
-	out, err := p.toolListBuilds(context.Background(), jc, map[string]any{})
+	out, err := p.toolListBuilds(map[string]any{}, jc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	outMap := out.(map[string]any)
-	runningArr := outMap["running"].([]map[string]any)
-	if !runningArr[0]["unparsed"].(bool) {
+
+	globalOut, ok := out.(*ListBuildsGlobalModeResponse)
+	if !ok {
+		t.Fatalf("expected *ListBuildsGlobalModeResponse, got %T", out)
+	}
+
+	if !globalOut.Running[0].Unparsed {
 		t.Fatal("expected unparsed")
 	}
-	if runningArr[0]["build_number"].(int) != 15 {
-		t.Fatalf("build_number = %v", runningArr[0]["build_number"])
+	if globalOut.Running[0].BuildNumber != 15 {
+		t.Fatalf("build_number = %v", globalOut.Running[0].BuildNumber)
 	}
 }
