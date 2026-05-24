@@ -4,7 +4,7 @@ go 1.25.5
 
 require (
 	github.com/hashicorp/go-plugin v1.7.0
-	github.com/seanly/dmr v0.0.0-20260524111924-525a7b57315e
+	github.com/seanly/dmr v0.0.0-20260524143802-50a1bf4a49c4
 )
 
 require (

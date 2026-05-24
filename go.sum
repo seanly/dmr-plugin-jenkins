@@ -41,8 +41,8 @@ github.com/oklog/run v1.1.0/go.mod h1:sVPdnTZT1zYwAJeCMu2Th4T21pA3FPOQRfWjQlk7DV
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/seanly/dmr v0.0.0-20260524111924-525a7b57315e h1:L9ggbrEtjs+9qslldhIFIvl7HfmXOdXAUbCKLNXB7Cg=
-github.com/seanly/dmr v0.0.0-20260524111924-525a7b57315e/go.mod h1:U6ecaZefDn0RX92mglDhtq1akdE5yaY5QrExSxxxexg=
+github.com/seanly/dmr v0.0.0-20260524143802-50a1bf4a49c4 h1:Hy3AUXBcr86P1YlYO0Pys3+g9vKsqJOavn6GwYdXR5A=
+github.com/seanly/dmr v0.0.0-20260524143802-50a1bf4a49c4/go.mod h1:U6ecaZefDn0RX92mglDhtq1akdE5yaY5QrExSxxxexg=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.7.2/go.mod h1:R6va5+xMeoiuVRoj+gSkQ7d3FALtqAAGI1FQKckRals=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=

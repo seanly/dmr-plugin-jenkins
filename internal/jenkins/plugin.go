@@ -71,6 +71,13 @@ func (p *JenkinsPlugin) RequestBatchApproval(req *proto.BatchApprovalRequest, re
 	return nil
 }
 
+// ProvideSystemPrompt returns an optional system prompt fragment (none for Jenkins).
+func (p *JenkinsPlugin) ProvideSystemPrompt(req *proto.ProvideSystemPromptRequest, resp *proto.ProvideSystemPromptResponse) error {
+	_ = req
+	resp.Fragment = ""
+	return nil
+}
+
 // ProvideTools returns the list of tools provided by this plugin.
 func (p *JenkinsPlugin) ProvideTools(req *proto.ProvideToolsRequest, resp *proto.ProvideToolsResponse) error {
 	resp.Tools = []proto.ToolDef{
