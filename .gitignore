@@ -1,16 +1,18 @@
 # Binary (local build / install artifact)
+bin/
 /dmr-plugin-jenkins
-dmr-plugin-jenkins
+/dmr-plugin-jenkins-*
 *.exe
-
-# Cross-compile outputs
-dmr-plugin-jenkins-*
 
 # Go
 *.test
 *.out
 coverage.out
 vendor/
+
+# Go workspace (copy go.work.example → go.work locally; often uses sibling ../dmr)
+go.work
+go.work.sum
 
 # Editor / OS
 .idea/

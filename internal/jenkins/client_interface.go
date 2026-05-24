@@ -1,4 +1,4 @@
-package main
+package jenkins
 
 import (
 	"context"
@@ -17,6 +17,10 @@ type JenkinsClient interface {
 	// Global operations
 	GetComputers(ctx context.Context) ([]byte, error)
 	GetQueue(ctx context.Context) ([]byte, error)
+
+	// SearchSuggest calls Jenkins core search autocomplete (GET .../search/suggest?query=).
+	// folder is a Job/Folder full name (e.g. team/android); empty searches from the root.
+	SearchSuggest(ctx context.Context, folder string, query string) ([]byte, error)
 
 	// Lifecycle
 	Close() error

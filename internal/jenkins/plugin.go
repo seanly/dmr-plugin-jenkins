@@ -1,4 +1,4 @@
-package main
+package jenkins
 
 import (
 	"context"
@@ -94,6 +94,21 @@ func (p *JenkinsPlugin) ProvideTools(req *proto.ProvideToolsRequest, resp *proto
 			}`,
 			Group:      "extended",
 			SearchHint: "jenkins, job, get, metadata, folder, ci, 任务, 获取, 元数据",
+		},
+		{
+			Name:        "jenkinsSearchJobs",
+			Description: "按关键词搜索 Jenkins 核心搜索索引的自动完成建议（GET search/suggest 或 suggestOpenSearch），结果可能包含非 Job 项；选中路径后应用 jenkinsGetJob 复核。可选 folder（Job/Folder full name）将范围限定在该 Item 之下",
+			ParametersJSON: `{
+				"type": "object",
+				"properties": {
+					"instance": {"type": "string", "description": "实例 id；省略时使用 default_instance"},
+					"folder": {"type": "string", "description": "可选 Folder/Job full name（如 team/android），限定在该作用域内搜索"},
+					"query": {"type": "string", "description": "搜索前缀或关键词"}
+				},
+				"required": ["query"]
+			}`,
+			Group:      "extended",
+			SearchHint: "jenkins, search, suggest, autocomplete, job, folder, ci, 搜索, 任务",
 		},
 		{
 			Name:        "jenkinsListBuilds",
@@ -220,6 +235,8 @@ func (p *JenkinsPlugin) executeToolWithTimeout(name string, args map[string]any,
 	switch name {
 	case "jenkinsGetJob":
 		return p.toolGetJob(args, client)
+	case "jenkinsSearchJobs":
+		return p.toolSearchJobs(args, client)
 	case "jenkinsListBuilds":
 		return p.toolListBuilds(args, client)
 	case "jenkinsGetBuild":

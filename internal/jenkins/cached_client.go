@@ -1,4 +1,4 @@
-package main
+package jenkins
 
 import (
 	"context"
@@ -22,9 +22,9 @@ type cacheEntry struct {
 
 // inventoryCache provides thread-safe caching for inventory data
 type inventoryCache struct {
-	mu    sync.RWMutex
-	data  map[string]cacheEntry
-	ttl   time.Duration
+	mu   sync.RWMutex
+	data map[string]cacheEntry
+	ttl  time.Duration
 }
 
 func newInventoryCache(ttl time.Duration) *inventoryCache {
@@ -138,6 +138,10 @@ func (c *cachedJenkinsClient) GetQueue(ctx context.Context) ([]byte, error) {
 
 	c.cache.set(key, data)
 	return data, nil
+}
+
+func (c *cachedJenkinsClient) SearchSuggest(ctx context.Context, folder string, query string) ([]byte, error) {
+	return c.inner.SearchSuggest(ctx, folder, query)
 }
 
 func (c *cachedJenkinsClient) Close() error {

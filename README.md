@@ -8,6 +8,7 @@ DMR external plugin for **multiple Jenkins instances** (HashiCorp [go-plugin](ht
 |------|-------------|
 | `jenkinsInstances` | Lists configured instance `id` and host (no secrets). |
 | `jenkinsGetJob` | `GET .../api/json` for a job (full name with folders). |
+| `jenkinsSearchJobs` | Search autocomplete via core `search/suggest` (`query` required; optional `folder` scopes under that full name). Results are suggestions—not guaranteed job full names; confirm with `jenkinsGetJob`. |
 | `jenkinsListBuilds` | 有 `job`：最近 builds；无 `job`：全局 running + queued（等待资源）。 |
 | `jenkinsGetBuild` | Build metadata for a build number. |
 | `jenkinsTriggerBuild` | `POST` `build` or `buildWithParameters`. |
@@ -68,11 +69,48 @@ Write tools (`jenkinsTriggerBuild`, and Phase 2 names in the set) require **appr
 
 ## Build
 
-From repo root (with `dmr` as sibling `./dmr` for `replace`):
+Uses standard layout: **`cmd/dmr-plugin-jenkins`** (main) + **`internal/jenkins`** (plugin).
+
+For local sibling **`dmr`**, copy **`go.work.example`** to **`go.work`** (see **`.gitignore`**). The workspace links this module with `../dmr` instead of editing `replace` directives.
 
 ```bash
-go build -o dmr-plugin-jenkins .
+cp go.work.example go.work   # adjust ../dmr path if needed
+go build -o bin/dmr-plugin-jenkins ./cmd/dmr-plugin-jenkins
+# or: make build
 ```
+
+Pin `github.com/seanly/dmr` after API changes (against sibling checkout):
+
+```bash
+make bump-dmr
+# Optional: make bump-dmr DMR_DIR=/path/to/dmr
+```
+
+Uses `GOPRIVATE` / `GONOSUMDB` for `github.com/seanly/dmr` during `go get` when tidy cannot reach the public checksum DB.
+
+## Install
+
+After **`make build`**, install the plugin binary into DMR’s plugin directory (default **`~/.dmr/plugins`**), matching `plugins[].path` in config:
+
+```bash
+make install
+# Override destination: make install INSTALL_DIR=/opt/dmr/plugins
+```
+
+Install the bundled OPA policy next to other Rego bundles (default **`~/.dmr/etc/policies`**). The target sets **`0700`** on the directory and **`0600`** on `jenkins.rego` so DMR `opa_policy` hot reload does not block on permissions (see `plugins/opapolicy/reload.go`).
+
+```bash
+make install-policy
+# Override: make install-policy POLICY_DIR=/path/to/policies
+```
+
+Both:
+
+```bash
+make install-all
+```
+
+Run **`make help`** for a short target summary.
 
 ## Develop
 

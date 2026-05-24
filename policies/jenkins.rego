@@ -8,6 +8,7 @@ decision := {"action": "allow", "reason": "jenkins read-only query", "risk": "lo
 	input.tool in [
 		"jenkinsInstances",
 		"jenkinsGetJob",
+		"jenkinsSearchJobs",
 		"jenkinsListBuilds",
 		"jenkinsGetBuild",
 		"jenkinsGetConsoleText"

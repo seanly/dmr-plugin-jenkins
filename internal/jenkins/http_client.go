@@ -1,4 +1,4 @@
-package main
+package jenkins
 
 import (
 	"bytes"
@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	maxErrBodyLen  = 2048 // max bytes included in error message snippets (httpError)
+	maxErrBodyLen  = 2048    // max bytes included in error message snippets (httpError)
 	maxReadBodyLen = 8 << 20 // 8MiB
 )
 
@@ -386,6 +386,41 @@ func (jc *httpJenkinsClient) GetQueue(ctx context.Context) ([]byte, error) {
 	st, body, err := jc.get(ctx, path)
 	if err != nil {
 		return nil, err
+	}
+	if st != 200 {
+		return nil, httpError(st, body)
+	}
+	return body, nil
+}
+
+func (jc *httpJenkinsClient) SearchSuggest(ctx context.Context, folder string, query string) ([]byte, error) {
+	q := strings.TrimSpace(query)
+	if q == "" {
+		return nil, fmt.Errorf("query is required")
+	}
+	f := strings.TrimSpace(folder)
+	var base string
+	if f == "" {
+		base = "/search/suggest"
+	} else {
+		base = jobURLPath(f) + "/search/suggest"
+	}
+	path := base + "?query=" + url.QueryEscape(q)
+	st, body, err := jc.get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	if st == http.StatusNotFound {
+		// Stapler name for Search#doSuggestOpenSearch (OpenSearch-style JSON payload).
+		alt := strings.TrimSuffix(base, "/search/suggest") + "/search/suggestOpenSearch?q=" + url.QueryEscape(q)
+		st2, body2, err2 := jc.get(ctx, alt)
+		if err2 != nil {
+			return nil, err2
+		}
+		if st2 != 200 {
+			return nil, httpError(st2, body2)
+		}
+		return body2, nil
 	}
 	if st != 200 {
 		return nil, httpError(st, body)

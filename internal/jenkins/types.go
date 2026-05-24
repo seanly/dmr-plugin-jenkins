@@ -1,4 +1,4 @@
-package main
+package jenkins
 
 import (
 	"encoding/json"
@@ -31,13 +31,29 @@ type GetJobResponse struct {
 	Data json.RawMessage `json:"data"`
 }
 
+// SearchJobsRequest parameters for jenkinsSearchJobs.
+type SearchJobsRequest struct {
+	Instance string `json:"instance,omitempty"`
+	Folder   string `json:"folder,omitempty"` // optional Folder/Job scope (full name)
+	Query    string `json:"query"`
+}
+
+// SearchJobsResponse is the response for jenkinsSearchJobs.
+type SearchJobsResponse struct {
+	Query       string   `json:"query"`
+	Folder      string   `json:"folder,omitempty"`
+	Suggestions []string `json:"suggestions,omitempty"` // Jenkins search paths / labels (may include non-job items)
+	RawJSON     string   `json:"raw_json,omitempty"`    // set when response could not be structured
+	ParseNote   string   `json:"parse_note,omitempty"`
+}
+
 // ============ Builds ============
 
 // ListBuildsRequest parameters for jenkinsListBuilds
 type ListBuildsRequest struct {
 	Instance       string `json:"instance,omitempty"`
-	Job            string `json:"job,omitempty"`            // Empty means global mode
-	Limit          int    `json:"limit,omitempty"`          // For job mode
+	Job            string `json:"job,omitempty"`             // Empty means global mode
+	Limit          int    `json:"limit,omitempty"`           // For job mode
 	IncludeRunning bool   `json:"include_running,omitempty"` // For global mode
 	IncludeQueued  bool   `json:"include_queued,omitempty"`  // For global mode
 	RunningLimit   int    `json:"running_limit,omitempty"`   // For global mode

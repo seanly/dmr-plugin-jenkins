@@ -1,5 +1,22 @@
 # 06 - 文件组织优化
 
+## 现行目录结构（已实现）
+
+采用 Go 惯例 **`cmd/` + `internal/`**：
+
+```
+dmr-plugin-jenkins/
+├── cmd/dmr-plugin-jenkins/main.go   # HashiCorp go-plugin 入口
+├── internal/jenkins/                # package jenkins：插件、工具、HTTP 客户端
+├── policies/
+├── docs/
+├── go.mod
+├── go.work.example                  # 本地复制为 go.work（已 .gitignore）
+└── Makefile
+```
+
+以下「当前问题 / 目标结构」为历史拆分设想与迁移参考，不代表当前源码仍集中为单文件 `tools.go`。
+
 ## 当前问题
 
 当前所有工具实现集中在 `tools.go`（587 行），随着功能增加会越来越难维护：
